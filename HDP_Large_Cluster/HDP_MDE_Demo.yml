@@ -1,0 +1,87 @@
+heat_template_version: 2013-05-23
+
+description: >
+  A document-based template to configure your Software Defined Environment.
+
+parameters:
+  flavor:
+    type: string
+    description: Flavor to be used for compute instance
+    default: "m1.small"
+  key_name:
+    type: string
+    description: Name of key-pair to be used for compute instance
+    default: "TODO"
+  network_id_internal:
+    type: string
+    description: Generated to reference 'internal' network.
+    default: "aea90075-b6e7-4da9-91e4-ce5c7cf1299c"
+  public_network_id:
+    type: string
+    description: Generated for floating IP
+    default: "TODO"
+
+resources:
+## REFERENCE {"internal":{"type": "OS::Neutron::Net", "properties": {"name": "internal", "network_id": "aea90075-b6e7-4da9-91e4-ce5c7cf1299c"}}}
+
+  autoscaling_group:
+    type: OS::Heat::AutoScalingGroup
+    properties:
+      min_size: 1
+      max_size: 3
+      resource:
+          type: HDP_MDE_Demo_Nested1.yaml
+          properties:
+            public_network_id: { get_param: public_network_id }
+            metering_query: {"metering.stack": {get_param: "OS::stack_id"}}
+            network_id_internal: { get_param: network_id_internal }
+            key_name: { get_param: key_name }
+            flavor: { get_param: flavor }
+
+  autoscaling_group_policy:
+      type: OS::Heat::ScalingPolicy
+      properties:
+        adjustment_type: change_in_capacity
+        auto_scaling_group_id: {get_resource: autoscaling_group}
+        cooldown: 60
+        scaling_adjustment: 1
+
+  autoscaling_group_policy_alarm:
+      type: OS::Ceilometer::Alarm
+      properties:
+        meter_name: cpu_util
+        statistic: avg
+        period: 60
+        evaluation_periods: 1
+        threshold: 50
+        alarm_actions:
+          - {get_attr: [autoscaling_group_policy, alarm_url]}
+        matching_metadata: {'metadata.user_metadata.stack': {get_param: "OS::stack_id"}}
+        comparison_operator: gt
+
+  autoscaling_group_scaledown_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: autoscaling_group}
+      cooldown: 60
+      scaling_adjustment: -1
+
+  autoscaling_group_scaledown_policy_cpu_alarm_low:
+    type: OS::Ceilometer::Alarm
+    properties:
+      meter_name: cpu_util
+      statistic: avg
+      period: 60
+      evaluation_periods: 1
+      threshold: 15
+      alarm_actions:
+        - {get_attr: [autoscaling_group_scaledown_policy, alarm_url]}
+      matching_metadata: {'metadata.user_metadata.stack': {get_param: "OS::stack_id"}}
+      comparison_operator: lt
+
+outputs:
+  blueprint_url:
+    description: Blueprint Origin URL
+    value:  http://10.7.29.33:8080/landscaper/view/projects?open=HDP_MDE_Demo
+

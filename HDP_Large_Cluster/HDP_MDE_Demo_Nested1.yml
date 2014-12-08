@@ -1,0 +1,52 @@
+## NESTED ##
+heat_template_version: 2013-05-23
+
+description: >
+  A document-based template to configure your Software Defined Environment.
+
+parameters:
+  flavor:
+    type: string
+    description: Flavor to be used for compute instance
+  key_name:
+    type: string
+    description: Name of key-pair to be used for compute instance
+  network_id_internal:
+    type: string
+    description: Generated to reference 'internal' network.
+  metering_query:
+    type: json
+    description: The metering query to associate samples with the alarm
+  public_network_id:
+    type: string
+    description: Generated for floating IP
+
+resources:
+  CentOS_6.5_Ambari_05:
+      type: OS::Nova::Server
+      properties:
+        networks:
+            - port: { get_resource: CentOS_6.5_Ambari_05_internal_port }
+        name: VM-AS
+        image: "9bdc1695-12dd-4f20-b58b-da1979db4343" # CentOS_6.5_Ambari_05
+        flavor: { get_param: flavor }
+        key_name: { get_param: key_name }
+        metadata: {get_param: metering_query}
+
+
+  CentOS_6.5_Ambari_05_CentOS_6.5_Ambari_05_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_05_internal_port }
+
+  CentOS_6.5_Ambari_05_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+outputs:
+  blueprint_url:
+    description: Blueprint Origin URL
+    value:  http://10.7.29.33:8080/landscaper/view/projects?open=HDP_MDE_Demo_Nested1
+

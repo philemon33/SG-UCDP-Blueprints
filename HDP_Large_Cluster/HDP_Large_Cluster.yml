@@ -1,0 +1,301 @@
+heat_template_version: 2013-05-23
+
+description: >
+  A document-based template to configure your Software Defined Environment.
+
+parameters:
+  flavor:
+    type: string
+    description: Flavor to be used for compute instance
+    default: "m1.small"
+  key_name:
+    type: string
+    description: Name of key-pair to be used for compute instance
+    default: "TODO"
+  network_id_internal:
+    type: string
+    description: Generated to reference 'internal' network.
+    default: "dc157237-a7fb-4676-b815-a322cd7338f7"
+  server_url:
+    type: string
+    description: The base URL for the server which hosts files required by user data. Do *not* add a trailing slash.
+    default: "http://10.7.29.33:8080/landscaper"
+  ucd_server_url:
+    type: string
+    description: The server URL for agent communication to UrbanCode Deploy. Do *not* add a trailing slash.
+    default: "http://10.7.29.33:8484"
+  ucd_user:
+    type: string
+    description: The user credential for the UrbanCode Deploy server.
+    default: "admin"
+  ucd_password:
+    type: string
+    description: The user credential for the UrbanCode Deploy server.
+    hidden: true
+  public_network_id:
+    type: string
+    description: Generated for floating IP
+    default: "TODO"
+
+resources:
+## REFERENCE {"internal":{"type": "OS::Neutron::Net", "properties": {"name": "internal", "network_id": "dc157237-a7fb-4676-b815-a322cd7338f7"}}}
+
+  CentOS_6.5_Ambari_04:
+    type: OS::Nova::Server
+    properties:
+      user_data_format: RAW
+      user_data: {get_resource: CentOS_6.5_Ambari_04_mime}
+      networks:
+          - port: { get_resource: CentOS_6.5_Ambari_04_internal_port }
+      name: Master
+      image: "d63327c4-2194-4466-adb4-92ede0a04ebb" # CentOS_6.5_Ambari_04
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+
+
+  CentOS_6.5_Ambari_04_CentOS_6.5_Ambari_04_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_04_internal_port }
+
+  HiveQuery:
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: HiveQuery_sw_config }
+      server: CentOS_6.5_Ambari_04
+      version: "LATEST" 
+      agent_timeout: "360"
+
+  HiveQuery_sw_config:
+    type: IBM::UrbanCode::SoftwareConfig::UCD
+    properties: 
+      name: "HiveQuery"
+      component_process: deploy
+      component_process_timeout: "300"
+      ucd_server_url: { get_param: ucd_server_url } # these should come from resource_tree
+      ucd_username: { get_param: ucd_user }
+      ucd_password: { get_param: ucd_password }
+      application: { get_attr: [resource_tree, application_name] }
+      environment_name: { get_attr: [resource_tree, environment_name] }
+      inputs:
+
+  DataMine:
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: DataMine_sw_config }
+      server: CentOS_6.5_Ambari_04
+      version: "LATEST" 
+      agent_timeout: "360"
+
+  DataMine_sw_config:
+    type: IBM::UrbanCode::SoftwareConfig::UCD
+    properties: 
+      name: "DataMine"
+      component_process: deploy
+      component_process_timeout: "300"
+      ucd_server_url: { get_param: ucd_server_url } # these should come from resource_tree
+      ucd_username: { get_param: ucd_user }
+      ucd_password: { get_param: ucd_password }
+      application: { get_attr: [resource_tree, application_name] }
+      environment_name: { get_attr: [resource_tree, environment_name] }
+      inputs:
+
+  AmbariMaster:
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: AmbariMaster_sw_config }
+      server: CentOS_6.5_Ambari_04
+      version: "LATEST" 
+      agent_timeout: "360"
+
+  AmbariMaster_sw_config:
+    type: IBM::UrbanCode::SoftwareConfig::UCD
+    properties: 
+      name: "AmbariMaster"
+      component_process: deploy
+      component_process_timeout: "300"
+      ucd_server_url: { get_param: ucd_server_url } # these should come from resource_tree
+      ucd_username: { get_param: ucd_user }
+      ucd_password: { get_param: ucd_password }
+      application: { get_attr: [resource_tree, application_name] }
+      environment_name: { get_attr: [resource_tree, environment_name] }
+      inputs:
+
+  CentOS_6.5_Ambari_04_mime:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+        - config: {get_resource: ucd_agent_install }
+
+  CentOS_6.5_Ambari_04_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+  CentOS_6.5_Ambari_041:
+    type: OS::Nova::Server
+    properties:
+      user_data_format: RAW
+      user_data: {get_resource: CentOS_6.5_Ambari_041_mime}
+      networks:
+          - port: { get_resource: CentOS_6.5_Ambari_041_internal_port }
+      name: Slave_01
+      image: "d63327c4-2194-4466-adb4-92ede0a04ebb" # CentOS_6.5_Ambari_04
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+
+  CentOS_6.5_Ambari_041_CentOS_6.5_Ambari_041_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_041_internal_port }
+
+  CentOS_6.5_Ambari_042:
+    type: OS::Nova::Server
+    properties:
+      user_data_format: RAW
+      user_data: {get_resource: CentOS_6.5_Ambari_042_mime}
+      networks:
+          - port: { get_resource: CentOS_6.5_Ambari_042_internal_port }
+      name: Slave_02
+      image: "d63327c4-2194-4466-adb4-92ede0a04ebb" # CentOS_6.5_Ambari_04
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+
+  CentOS_6.5_Ambari_042_CentOS_6.5_Ambari_042_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_042_internal_port }
+
+  AmbariNode1:
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: AmbariNode_sw_config }
+      server: CentOS_6.5_Ambari_042
+      version: "LATEST" 
+      agent_timeout: "360"
+
+  CentOS_6.5_Ambari_042_mime:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+        - config: {get_resource: ucd_agent_install }
+
+  CentOS_6.5_Ambari_042_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+  CentOS_6.5_Ambari_043:
+    type: OS::Nova::Server
+    properties:
+      user_data_format: RAW
+      user_data: {get_resource: CentOS_6.5_Ambari_043_mime}
+      networks:
+          - port: { get_resource: CentOS_6.5_Ambari_043_internal_port }
+      name: Slave_03
+      image: "d63327c4-2194-4466-adb4-92ede0a04ebb" # CentOS_6.5_Ambari_04
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+
+  CentOS_6.5_Ambari_043_CentOS_6.5_Ambari_043_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_043_internal_port }
+
+  AmbariNode2:
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: AmbariNode_sw_config }
+      server: CentOS_6.5_Ambari_043
+      version: "LATEST" 
+      agent_timeout: "360"
+
+  CentOS_6.5_Ambari_043_mime:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+        - config: {get_resource: ucd_agent_install }
+
+  CentOS_6.5_Ambari_043_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+  AmbariNode:
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: AmbariNode_sw_config }
+      server: CentOS_6.5_Ambari_041
+      version: "LATEST" 
+      agent_timeout: "360"
+
+  AmbariNode_sw_config:
+    type: IBM::UrbanCode::SoftwareConfig::UCD
+    properties: 
+      name: "AmbariNode"
+      component_process: deploy
+      component_process_timeout: "300"
+      ucd_server_url: { get_param: ucd_server_url } # these should come from resource_tree
+      ucd_username: { get_param: ucd_user }
+      ucd_password: { get_param: ucd_password }
+      application: { get_attr: [resource_tree, application_name] }
+      environment_name: { get_attr: [resource_tree, environment_name] }
+      inputs:
+
+  CentOS_6.5_Ambari_041_mime:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+        - config: {get_resource: ucd_agent_install }
+
+  CentOS_6.5_Ambari_041_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+  resource_tree:
+    type: IBM::UrbanCode::ResourceTree
+    properties: 
+       urbancode_deploy_url: { get_param: ucd_server_url }
+       username: { get_param: ucd_user }
+       password: { get_param: ucd_password }
+       team_mappings: 
+       application: HDPSampleStockTicker
+       base_resource_group: 
+
+  ucd_agent_install:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            arch=`uname -ms | awk '{print tolower($0)}' | tr " " "-" `
+            curl -Lk -o /tmp/ucd-agent-installer.zip -u _ucd_user_:_ucd_password_ "_ucd_server_url_/cli/version/downloadArtifacts?component=ucd-agent-$arch&version=_agent_version_"
+            if which apt-get; then sudo apt-get -y -q install unzip; fi;
+            unzip -q /tmp/ucd-agent-installer.zip -d /tmp
+            tar xfz  /tmp/ibm-ucd-agent-$arch.tgz -C /tmp
+            /tmp/ibm-ucd-agent-install/install-agent-with-options.sh -t "_agent_team_" -s _ucd_server_url_ -x start -n _agent_name_ 
+          params:
+            _agent_name_:
+               str_replace:
+                  template: |
+                    "_application_name_._environment_name_"
+                  params:
+                    _application_name_: { get_attr: [resource_tree, application_name ] }
+                    _environment_name_: { get_param: "OS::stack_name" }
+            _ucd_server_url_: { get_param: ucd_server_url }
+            _ucd_user_ : { get_param: ucd_user }
+            _ucd_password_ : { get_param: ucd_password }
+            _agent_version_ : 7.1
+            _agent_team_ :
+
+outputs:
+  blueprint_url:
+    description: Blueprint Origin URL
+    value:  http://10.7.29.33:8080/landscaper/view/projects?open=HDP_Large_Cluster
+

@@ -1,0 +1,387 @@
+heat_template_version: 2013-05-23
+
+description: >
+  A document-based template to configure your Software Defined Environment.
+
+parameters:
+  flavor:
+    type: string
+    description: Flavor to be used for compute instance
+    default: "m1.large"
+  key_name:
+    type: string
+    description: Name of key-pair to be used for compute instance
+    default: "Default"
+  network_id_internal:
+    type: string
+    description: Generated to reference 'internal' network.
+    default: "aea90075-b6e7-4da9-91e4-ce5c7cf1299c"
+  public_network_id:
+    type: string
+    description: Generated for floating IP
+    default: "18528c7f-d70b-4a38-9655-e665b8dee700"
+  ucd_server_url:
+    type: string
+    description: The server URL for agent communication to UrbanCode Deploy. Do *not* add a trailing slash.
+    default: "http://10.7.29.33:8484"
+  ucd_user:
+    type: string
+    description: The user credential for the UrbanCode Deploy server.
+    default: "admin"
+  ucd_password:
+    type: string
+    description: The user credential for the UrbanCode Deploy server.
+    hidden: true
+    default: "admin"
+  ambari_master_hn:
+    type: string
+    description: Hostname for Ambari Master
+    default: "sg-am-01-801"
+  ambari_slave_1_hn:
+    type: string
+    description: Hostname for Ambari Slave 1
+    default: "sg-as-01-801"
+  ambari_slave_2_hn:
+    type: string
+    description: Hostname for Ambari Slave 2
+    default: "sg-as-02-801"
+  ambari_slave_3_hn:
+    type: string
+    description: Hostname for Ambari Slave 3
+    default: "sg-as-03-801"
+  ambari_slave_4_hn:
+    type: string
+    description: Hostname for Ambari Slave 4
+    default: "sg-as-04-801"
+  ambari_slave_5_hn:
+    type: string
+    description: Hostname for Ambari Slave 5
+    default: "sg-as-05-801"
+  
+
+resources:
+  CentOS_6.5_Ambari_05:
+    type: OS::Nova::Server
+    properties:
+      user_data_format: RAW
+      user_data: {get_resource: CentOS_6.5_Ambari_05_mime}
+      networks:
+          - port: { get_resource: CentOS_6.5_Ambari_05_internal_port }
+      name: { get_param: ambari_master_hn }  # Hostname for Ambari Master
+      image: "9bdc1695-12dd-4f20-b58b-da1979db4343" # CentOS_6.5_Ambari_05
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+
+
+  AmbariMaster:
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: AmbariMaster_sw_config }
+      server: CentOS_6.5_Ambari_05
+      version: "LATEST" 
+      agent_timeout: "360"
+
+  AmbariMaster_sw_config:
+    type: IBM::UrbanCode::SoftwareConfig::UCD
+    properties: 
+      name: "AmbariMaster"
+      component_process: deploy
+      component_process_timeout: "3600"
+      ucd_server_url: { get_param: ucd_server_url } # these should come from resource_tree
+      ucd_username: { get_param: ucd_user }
+      ucd_password: { get_param: ucd_password }
+      application: { get_attr: [resource_tree, application_name] }
+      environment_name: { get_attr: [resource_tree, environment_name] }
+      inputs:
+
+  CentOS_6.5_Ambari_05_mime:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+        - config: {get_resource: ucd_agent_install }
+        - config: { get_resource: ambari_hosts_configuration }  # OS::Heat::SoftwareConfig
+
+  CentOS_6.5_Ambari_05_CentOS_6.5_Ambari_05_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_05_internal_port }
+
+  CentOS_6.5_Ambari_05_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+  CentOS_6.5_Ambari_051:
+    type: OS::Nova::Server
+    properties:
+      user_data_format: RAW
+      user_data: {get_resource: CentOS_6.5_Ambari_051_mime}
+      networks:
+          - port: { get_resource: CentOS_6.5_Ambari_051_internal_port }
+      name: { get_param: ambari_slave_1_hn }  # Hostname for Ambari Slave 1
+      image: "9bdc1695-12dd-4f20-b58b-da1979db4343" # CentOS_6.5_Ambari_05
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+
+  CentOS_6.5_Ambari_0511:
+      type: OS::Nova::Server
+      properties:
+        networks:
+            - port: { get_resource: CentOS_6.5_Ambari_0511_internal_port }
+        user_data_format: RAW
+        user_data: {get_resource: CentOS_6.5_Ambari_0511_mime}
+        name: { get_param: ambari_slave_2_hn }  # Hostname for Ambari Slave 2
+        image: "9bdc1695-12dd-4f20-b58b-da1979db4343" # CentOS_6.5_Ambari_05
+        flavor: { get_param: flavor }
+        key_name: { get_param: key_name }
+
+  CentOS_6.5_Ambari_0511_CentOS_6.5_Ambari_0511_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_0511_internal_port }
+
+  CentOS_6.5_Ambari_0511_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+  CentOS_6.5_Ambari_0511_mime:
+      type: OS::Heat::MultipartMime
+      properties:
+        parts:
+          - config: {get_resource: ucd_agent_install }
+
+  CentOS_6.5_Ambari_0512:
+      type: OS::Nova::Server
+      properties:
+        networks:
+            - port: { get_resource: CentOS_6.5_Ambari_0512_internal_port }
+        user_data_format: RAW
+        user_data: {get_resource: CentOS_6.5_Ambari_0512_mime}
+        name: { get_param: ambari_slave_3_hn }  # Hostname for Ambari Slave 3
+        image: "9bdc1695-12dd-4f20-b58b-da1979db4343" # CentOS_6.5_Ambari_05
+        flavor: { get_param: flavor }
+        key_name: { get_param: key_name }
+
+  CentOS_6.5_Ambari_0512_CentOS_6.5_Ambari_0512_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_0512_internal_port }
+
+  CentOS_6.5_Ambari_0512_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+  CentOS_6.5_Ambari_0512_mime:
+      type: OS::Heat::MultipartMime
+      properties:
+        parts:
+          - config: {get_resource: ucd_agent_install }
+
+  CentOS_6.5_Ambari_0513:
+      type: OS::Nova::Server
+      properties:
+        networks:
+            - port: { get_resource: CentOS_6.5_Ambari_0513_internal_port }
+        user_data_format: RAW
+        user_data: {get_resource: CentOS_6.5_Ambari_0513_mime}
+        name: { get_param: ambari_slave_4_hn }  # Hostname for Ambari Slave 4
+        image: "9bdc1695-12dd-4f20-b58b-da1979db4343" # CentOS_6.5_Ambari_05
+        flavor: { get_param: flavor }
+        key_name: { get_param: key_name }
+
+  CentOS_6.5_Ambari_0513_CentOS_6.5_Ambari_0513_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_0513_internal_port }
+
+  CentOS_6.5_Ambari_0513_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+  CentOS_6.5_Ambari_0513_mime:
+      type: OS::Heat::MultipartMime
+      properties:
+        parts:
+          - config: {get_resource: ucd_agent_install }
+
+  CentOS_6.5_Ambari_0514:
+      type: OS::Nova::Server
+      properties:
+        networks:
+            - port: { get_resource: CentOS_6.5_Ambari_0514_internal_port }
+        user_data_format: RAW
+        user_data: {get_resource: CentOS_6.5_Ambari_0514_mime}
+        name: { get_param: ambari_slave_5_hn }  # Hostname for Ambari Slave 5
+        image: "9bdc1695-12dd-4f20-b58b-da1979db4343" # CentOS_6.5_Ambari_05
+        flavor: { get_param: flavor }
+        key_name: { get_param: key_name }
+
+  CentOS_6.5_Ambari_0514_CentOS_6.5_Ambari_0514_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_0514_internal_port }
+
+  CentOS_6.5_Ambari_0514_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+  CentOS_6.5_Ambari_0514_mime:
+      type: OS::Heat::MultipartMime
+      properties:
+        parts:
+          - config: {get_resource: ucd_agent_install }
+
+  AmbariNode4:
+      type: IBM::UrbanCode::SoftwareDeploy::UCD
+      properties:
+        apply_config: { get_resource: AmbariNode_sw_config }
+        server: CentOS_6.5_Ambari_0514
+        version: "LATEST" 
+        agent_timeout: "360"
+
+  AmbariNode3:
+      type: IBM::UrbanCode::SoftwareDeploy::UCD
+      properties:
+        apply_config: { get_resource: AmbariNode_sw_config }
+        server: CentOS_6.5_Ambari_0513
+        version: "LATEST" 
+        agent_timeout: "360"
+
+  AmbariNode2:
+      type: IBM::UrbanCode::SoftwareDeploy::UCD
+      properties:
+        apply_config: { get_resource: AmbariNode_sw_config }
+        server: CentOS_6.5_Ambari_0512
+        version: "LATEST" 
+        agent_timeout: "360"
+
+  AmbariNode1:
+      type: IBM::UrbanCode::SoftwareDeploy::UCD
+      properties:
+        apply_config: { get_resource: AmbariNode_sw_config }
+        server: CentOS_6.5_Ambari_0511
+        version: "LATEST" 
+        agent_timeout: "360"
+
+  AmbariNode:
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: AmbariNode_sw_config }
+      server: CentOS_6.5_Ambari_051
+      version: "LATEST" 
+      agent_timeout: "360"
+
+  AmbariNode_sw_config:
+    type: IBM::UrbanCode::SoftwareConfig::UCD
+    properties: 
+      name: "AmbariNode"
+      component_process: deploy
+      component_process_timeout: "600"
+      ucd_server_url: { get_param: ucd_server_url } # these should come from resource_tree
+      ucd_username: { get_param: ucd_user }
+      ucd_password: { get_param: ucd_password }
+      application: { get_attr: [resource_tree, application_name] }
+      environment_name: { get_attr: [resource_tree, environment_name] }
+      inputs:
+
+  CentOS_6.5_Ambari_051_mime:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+        - config: {get_resource: ucd_agent_install }
+
+  CentOS_6.5_Ambari_051_CentOS_6.5_Ambari_051_internal_port_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: CentOS_6.5_Ambari_051_internal_port }
+
+  CentOS_6.5_Ambari_051_internal_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_internal }
+
+  resource_tree:
+    type: IBM::UrbanCode::ResourceTree
+    properties: 
+       urbancode_deploy_url: { get_param: ucd_server_url }
+       username: { get_param: ucd_user }
+       password: { get_param: ucd_password }
+       team_mappings: 
+       application: MDE
+       base_resource_group: 
+
+  ucd_agent_install:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            arch=`uname -ms | awk '{print tolower($0)}' | tr " " "-" `
+            curl -Lk -o /tmp/ucd-agent-installer.zip -u _ucd_user_:_ucd_password_ "_ucd_server_url_/cli/version/downloadArtifacts?component=ucd-agent-$arch&version=_agent_version_"
+            if which apt-get; then sudo apt-get -y -q install unzip; fi;
+            unzip -q /tmp/ucd-agent-installer.zip -d /tmp
+            tar xfz  /tmp/ibm-ucd-agent-$arch.tgz -C /tmp
+            /tmp/ibm-ucd-agent-install/install-agent-with-options.sh -t "_agent_team_" -s _ucd_server_url_ -x start -n _agent_name_ 
+          params:
+            _agent_name_:
+               str_replace:
+                  template: |
+                    "_application_name_._environment_name_"
+                  params:
+                    _application_name_: { get_attr: [resource_tree, application_name ] }
+                    _environment_name_: { get_param: "OS::stack_name" }
+            _ucd_server_url_: { get_param: ucd_server_url }
+            _ucd_user_ : { get_param: ucd_user }
+            _ucd_password_ : { get_param: ucd_password }
+            _agent_version_ : 7.1
+            _agent_team_ :
+     
+  ambari_hosts_configuration:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/bin/bash
+            echo "_ambari_slave_1_ip_ _ambari_slave_1_hn_.novalocal" >> /tmp/ambari-hosts
+            echo "_ambari_slave_2_ip_ _ambari_slave_2_hn_.novalocal" >> /tmp/ambari-hosts
+            echo "_ambari_slave_3_ip_ _ambari_slave_3_hn_.novalocal" >> /tmp/ambari-hosts
+            echo "_ambari_slave_4_ip_ _ambari_slave_4_hn_.novalocal" >> /tmp/ambari-hosts
+            echo "_ambari_slave_5_ip_ _ambari_slave_5_hn_.novalocal" >> /tmp/ambari-hosts
+          params:
+            _ambari_slave_1_ip_: { get_attr: [CentOS_6.5_Ambari_051, networks, "internal", 0] }
+            _ambari_slave_1_hn_: { get_param: ambari_slave_1_hn }
+            _ambari_slave_2_ip_: { get_attr: [CentOS_6.5_Ambari_0511, networks, "internal", 0] }
+            _ambari_slave_2_hn_: { get_param: ambari_slave_2_hn }
+            _ambari_slave_3_ip_: { get_attr: [CentOS_6.5_Ambari_0512, networks, "internal", 0] }
+            _ambari_slave_3_hn_: { get_param: ambari_slave_3_hn }
+            _ambari_slave_4_ip_: { get_attr: [CentOS_6.5_Ambari_0513, networks, "internal", 0] }
+            _ambari_slave_4_hn_: { get_param: ambari_slave_4_hn }
+            _ambari_slave_5_ip_: { get_attr: [CentOS_6.5_Ambari_0514, networks, "internal", 0] }
+            _ambari_slave_5_hn_: { get_param: ambari_slave_5_hn }
+
+
+outputs:
+  blueprint_url:
+    description: Blueprint Origin URL
+    value:  http://10.7.29.33:8080/landscaper/view/projects?open=HDP_MDE_Cluster
+  ambari_web:
+    description: Ambari Web Interface
+    value:
+      str_replace:
+        template: |
+          http://_ambari_master_ip_:8080/
+        params:
+          _ambari_master_ip_: { get_attr: [CentOS_6.5_Ambari_05, networks, "internal", 1] }
+
